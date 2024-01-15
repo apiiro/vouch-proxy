@@ -62,10 +62,15 @@ func AuthStateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	requestedURL, ok := session.Values["requestedURL"].(string)
+	if !ok || requestedURL == "" {
+		requestedURL = "/"
+	}
+
 	// is the nonce "state" valid?
 	queryState := r.URL.Query().Get("state")
 	if session.Values["state"] != queryState {
-		responses.Error400(w, r, fmt.Errorf("/auth Invalid session state: stored %s, returned %s", session.Values["state"], queryState))
+		responses.Error400WithClientRedirect(w, r, fmt.Errorf("/auth Invalid session state: stored %s, returned %s", session.Values["state"], queryState), requestedURL)
 		return
 	}
 
@@ -82,8 +87,6 @@ func AuthStateHandler(w http.ResponseWriter, r *http.Request) {
 			oauth2.SetAuthURLParam("code_verifier", session.Values["codeVerifier"].(string)),
 		}
 	}
-
-	requestedURL := session.Values["requestedURL"].(string)
 
 	if err := getUserInfo(r, &user, &customClaims, &ptokens, authCodeOptions...); err != nil {
 		responses.Error400WithClientRedirect(w, r, fmt.Errorf("/auth Error while retrieving user info after successful login at the OAuth provider: %w", err), requestedURL)
